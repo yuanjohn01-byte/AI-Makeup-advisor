@@ -1,0 +1,7 @@
+{
+  "name": "AI Makeup Stylist",
+  "description": "A hyper-personalized makeup guidance platform based on facial analysis and style matching.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
