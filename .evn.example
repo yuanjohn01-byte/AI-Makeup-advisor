@@ -1,6 +1,0 @@
-# Gemini API Key (你需要填入你自己的 Key)
-GEMINI_API_KEY=
-
-# Supabase 配置 
-VITE_SUPABASE_URL=
-VITE_SUPABASE_ANON_KEY=

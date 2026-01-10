@@ -1,7 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Sparkles, Loader2, MessageCircle, CheckCircle2, Circle } from 'lucide-react';
-import { GoogleGenAI, Type } from "@google/genai";
 import { useUserPreferences, ChatMessage } from '../store/useUserPreferences';
 import { translations } from '../i18n';
 
@@ -43,68 +42,22 @@ export const ConsultationChat: React.FC<Props> = ({ onProceed }) => {
     setIsSending(true);
 
     try {
-      // 从全局配置读取 API Key（config.js 中定义）
-      const apiKey = (window as any).__APP_CONFIG__?.GEMINI_API_KEY || '';
-      if (!apiKey) {
-        throw new Error('API Key not configured');
-      }
-      const ai = new GoogleGenAI({ apiKey });
-      const model = "gemini-3-flash-preview";
-      const targetLang = language === 'zh' ? 'Chinese' : 'English';
-
-      const systemInstruction = `
-        You are a supportive, high-energy "Makeup Bestie". 
-        ALWAYS RESPOND IN: ${targetLang}.
-        
-        YOUR MISSION: 
-        Collect two key pieces of information from the user:
-        1. Makeup Style (e.g., Natural, Bold, Vintage, K-Pop).
-        2. Environment/Occasion (e.g., Office, Date, Party, Wedding).
-
-        BEHAVIOR:
-        - If Style is missing, ask about their desired look.
-        - If Environment is missing, ask where they are going.
-        - If both are present, confirm their choice and tell them you are ready for the face scan.
-        - ALWAYS keep the conversation helpful and focused.
-
-        MANDATORY: RESPONSE MUST BE A SINGLE VALID JSON OBJECT.
-        JSON Structure:
-        {
-          "reply_text": "Your friendly message in ${targetLang}",
-          "extracted_concerns": ["concise_tag_in_en"],
-          "extracted_style": ["one_main_style_in_en"],
-          "extracted_environment": "one_main_env_in_en or null",
-          "is_ready": true/false
-        }
-      `;
-
-      const responseSchema = {
-        type: Type.OBJECT,
-        properties: {
-          reply_text: { type: Type.STRING },
-          extracted_concerns: { type: Type.ARRAY, items: { type: Type.STRING } },
-          extracted_style: { type: Type.ARRAY, items: { type: Type.STRING } },
-          extracted_environment: { type: Type.STRING, nullable: true },
-          is_ready: { type: Type.BOOLEAN }
-        },
-        required: ["reply_text", "extracted_concerns", "extracted_style", "is_ready"]
-      };
-
-      const context = chatHistory.length > 0 
-        ? `History:\n${chatHistory.map(m => `${m.role}: ${m.content}`).join('\n')}\nUser: ${currentInput}`
-        : `User: ${currentInput}`;
-
-      const result = await ai.models.generateContent({
-        model,
-        contents: context,
-        config: {
-          systemInstruction,
-          responseMimeType: "application/json",
-          responseSchema: responseSchema,
-        }
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chatHistory,
+          currentInput,
+          language
+        }),
       });
 
-      const data = JSON.parse(result.text);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to connect to AI bestie');
+      }
+
+      const data = await response.json();
       
       // Update store with extracted info
       if (data.extracted_concerns) data.extracted_concerns.forEach((c: string) => addConcern(c));
