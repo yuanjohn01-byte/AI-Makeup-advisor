@@ -5,6 +5,8 @@ export const config = {
 };
 
 export default async function handler(req: any, res: any) {
+  console.log("Generate Plan API triggered");
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -12,18 +14,22 @@ export default async function handler(req: any, res: any) {
   const { style, faceAnalysis, language = 'en' } = req.body;
 
   if (!style || !faceAnalysis) {
+    console.error("Missing style or faceAnalysis in request body");
     return res.status(400).json({ error: 'Missing style or face analysis data' });
   }
 
   const apiKey = process.env.GEMINI_API_KEY;
-
   if (!apiKey) {
+    console.error("GEMINI_API_KEY environment variable is not set");
     return res.status(500).json({ error: 'GEMINI_API_KEY not configured on server' });
   }
 
   try {
     const ai = new GoogleGenAI({ apiKey });
-    const model = "gemini-2.0-flash";
+    // Reverting to the original model name
+    const modelName = "gemini-3-flash-preview";
+    console.log(`Using model: ${modelName}`);
+
     const targetLang = language === 'zh' ? 'Chinese' : 'English';
 
     const prompt = `
@@ -67,7 +73,7 @@ export default async function handler(req: any, res: any) {
     };
 
     const response = await ai.models.generateContent({
-      model,
+      model: modelName,
       contents: prompt,
       config: {
         tools: [{ googleSearch: {} }],
@@ -76,9 +82,20 @@ export default async function handler(req: any, res: any) {
       }
     });
 
+    if (!response.text) {
+      console.error("Gemini API returned an empty response text");
+      throw new Error("Empty response from AI model");
+    }
+
+    console.log("Successfully received makeup plan from Gemini");
     return res.status(200).json(JSON.parse(response.text));
   } catch (error: any) {
-    console.error("Plan API failed:", error);
+    console.error("Plan API Error Details:", {
+      message: error.message,
+      stack: error.stack,
+      status: error.status,
+      details: error.details
+    });
     return res.status(500).json({ error: error.message || 'Internal Server Error' });
   }
 }

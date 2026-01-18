@@ -5,6 +5,8 @@ export const config = {
 };
 
 export default async function handler(req: any, res: any) {
+  console.log("Chat API triggered");
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -12,18 +14,22 @@ export default async function handler(req: any, res: any) {
   const { chatHistory = [], currentInput, language = 'en' } = req.body;
 
   if (!currentInput) {
+    console.error("Missing currentInput in request body");
     return res.status(400).json({ error: 'Missing input' });
   }
 
   const apiKey = process.env.GEMINI_API_KEY;
-
   if (!apiKey) {
+    console.error("GEMINI_API_KEY environment variable is not set");
     return res.status(500).json({ error: 'GEMINI_API_KEY not configured on server' });
   }
 
   try {
     const ai = new GoogleGenAI({ apiKey });
-    const model = "gemini-2.0-flash";
+    // Reverting to the original model name
+    const modelName = "gemini-3-flash-preview";
+    console.log(`Using model: ${modelName}`);
+
     const targetLang = language === 'zh' ? 'Chinese' : 'English';
 
     const systemInstruction = `
@@ -69,7 +75,7 @@ export default async function handler(req: any, res: any) {
       : `User: ${currentInput}`;
 
     const response = await ai.models.generateContent({
-      model,
+      model: modelName,
       contents: historyPrompt,
       config: {
         systemInstruction,
@@ -78,9 +84,20 @@ export default async function handler(req: any, res: any) {
       }
     });
 
+    if (!response.text) {
+      console.error("Gemini API returned an empty response text");
+      throw new Error("Empty response from AI model");
+    }
+
+    console.log("Successfully received chat response from Gemini");
     return res.status(200).json(JSON.parse(response.text));
   } catch (error: any) {
-    console.error("Chat API failed:", error);
+    console.error("Chat API Error Details:", {
+      message: error.message,
+      stack: error.stack,
+      status: error.status,
+      details: error.details
+    });
     return res.status(500).json({ error: error.message || 'Internal Server Error' });
   }
 }
